@@ -1884,6 +1884,18 @@ function renderOvLiveOpsPreview(){
 
 const sparkCharts = {};
 
+// Shared external tooltip element for sparks
+function getSparkTip(){
+  let tip = document.getElementById('sparkTip');
+  if(!tip){
+    tip = document.createElement('div');
+    tip.id = 'sparkTip';
+    tip.style.cssText = 'position:fixed;z-index:9999;pointer-events:none;background:rgba(7,11,20,0.97);border-radius:8px;padding:8px 12px;font-family:var(--sans);font-size:11px;color:#E8ECFF;box-shadow:0 6px 24px rgba(0,0,0,0.5);opacity:0;transition:opacity .08s;white-space:nowrap';
+    document.body.appendChild(tip);
+  }
+  return tip;
+}
+
 function drawSpark(id, data, color, fmt, dates){
   const c = g(id); if(!c) return;
   if(sparkCharts[id]){ try{sparkCharts[id].destroy();}catch(e){} delete sparkCharts[id]; }
@@ -1893,7 +1905,6 @@ function drawSpark(id, data, color, fmt, dates){
 
   const formatter = fmt || fmtKn;
 
-  // Format date nicely: "2026-04-15" → "Wed, 15 Apr"
   const fmtDate = (iso) => {
     if(!iso) return '';
     const d = new Date(iso + 'T00:00:00');
@@ -1934,38 +1945,48 @@ function drawSpark(id, data, color, fmt, dates){
       plugins: {
         legend: { display: false },
         tooltip: {
-          enabled: true,
-          animation: false,
-          mode: 'index',
-          intersect: false,
-          backgroundColor: 'rgba(7,11,20,0.96)',
-          titleColor: '#E8ECFF',
-          bodyColor: color,
-          borderColor: color,
-          borderWidth: 1,
-          padding: 8,
-          titleFont: { family: 'Inter', size: 11, weight: '600' },
-          bodyFont: { family: 'JetBrains Mono', size: 11 },
-          displayColors: false,
-          callbacks: {
-            title: (items) => {
-              const i = items[0].dataIndex;
-              return (dates && dates[i]) ? fmtDate(dates[i]) : '';
-            },
-            label: ctx => formatter(ctx.parsed.y),
-            afterBody: (items) => {
-              const i = items[0].dataIndex;
-              const cur = vals[i];
-              // Find previous non-null value
-              let prev = null;
-              for(let j = i - 1; j >= 0; j--){ if(vals[j] != null){ prev = vals[j]; break; } }
-              if(cur == null || prev == null) return '';
+          enabled: false,
+          external: (context) => {
+            const tip = getSparkTip();
+            const tt = context.tooltip;
+            if(tt.opacity === 0){ tip.style.opacity = '0'; return; }
+            if(!tt.dataPoints || !tt.dataPoints.length){ tip.style.opacity = '0'; return; }
+
+            const i = tt.dataPoints[0].dataIndex;
+            const cur = vals[i];
+            const dateLbl = (dates && dates[i]) ? fmtDate(dates[i]) : '';
+
+            // Find previous non-null value
+            let prev = null;
+            for(let j = i - 1; j >= 0; j--){ if(vals[j] != null){ prev = vals[j]; break; } }
+            let diffLine = '';
+            if(cur != null && prev != null){
               const diff = cur - prev;
               const pct = prev !== 0 ? (diff / Math.abs(prev) * 100) : 0;
               const arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '•');
               const sign = diff > 0 ? '+' : '';
-              return [`vs prev: ${arrow} ${sign}${formatter(diff)} (${sign}${pct.toFixed(1)}%)`];
+              const col = diff > 0 ? '#A6FF4D' : (diff < 0 ? '#FF5470' : '#8A94BE');
+              diffLine = `<div style="font-size:10px;color:${col};margin-top:3px">vs prev: ${arrow} ${sign}${formatter(diff)} (${sign}${pct.toFixed(1)}%)</div>`;
             }
+
+            tip.innerHTML =
+              (dateLbl ? `<div style="font-weight:600;color:#E8ECFF;margin-bottom:3px">${dateLbl}</div>` : '')
+              + `<div style="font-family:var(--mono);font-size:13px;color:${color};font-weight:600">${formatter(cur)}</div>`
+              + diffLine;
+
+            // Position above the canvas, escaping the card bounds
+            const rect = context.chart.canvas.getBoundingClientRect();
+            tip.style.opacity = '1';
+            // Wait for layout to get size
+            const tipRect = tip.getBoundingClientRect();
+            let left = rect.left + tt.caretX - tipRect.width / 2;
+            let top = rect.top - tipRect.height - 8;
+            // Keep within viewport
+            if(left < 6) left = 6;
+            if(left + tipRect.width > window.innerWidth - 6) left = window.innerWidth - tipRect.width - 6;
+            if(top < 6) top = rect.bottom + 8; // if no room above, show below
+            tip.style.left = left + 'px';
+            tip.style.top = top + 'px';
           }
         }
       },
@@ -1974,6 +1995,12 @@ function drawSpark(id, data, color, fmt, dates){
         y: { display: false }
       }
     }
+  });
+
+  // Hide tooltip when mouse leaves the card
+  c.addEventListener('mouseleave', () => {
+    const tip = document.getElementById('sparkTip');
+    if(tip) tip.style.opacity = '0';
   });
 }
 
