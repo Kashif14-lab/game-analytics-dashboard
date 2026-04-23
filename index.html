@@ -398,10 +398,35 @@ textarea.form-ctrl{resize:vertical;min-height:78px}
   .game-select{min-width:160px}
   .nps-hero{flex-direction:column;gap:16px}
 }
+#loginScreen{position:fixed;inset:0;z-index:99999;background:var(--bg);display:flex;align-items:center;justify-content:center}
+.loginCard{position:relative;z-index:1;background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:44px 40px;width:400px;box-shadow:0 8px 40px rgba(0,0,0,.5);text-align:center}
+.loginH{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px;font-family:var(--sans)}
+.loginSub{font-size:13px;color:var(--text3);margin-bottom:28px;font-family:var(--sans)}
+.lf{margin-bottom:14px;text-align:left}
+.lf label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);display:block;margin-bottom:5px;font-family:var(--sans)}
+.lf input{width:100%;padding:11px 13px;background:var(--bg2);border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--mono);font-size:13px;outline:none;transition:border-color .2s}
+.lf input:focus{border-color:var(--cyan)}
+.lf input::placeholder{color:var(--text3)}
+.loginBtn{width:100%;padding:12px;margin-top:6px;background:linear-gradient(135deg,var(--cyan),var(--violet));color:#fff;border:none;border-radius:8px;font-family:var(--sans);font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s}
+.loginBtn:hover{opacity:.88}
+.loginErr{color:var(--coral);font-size:12px;text-align:center;margin-top:10px;display:none;font-weight:600;font-family:var(--mono)}
 </style>
 </head>
 <body>
-<div class="shell">
+
+<div id="loginScreen" style="display:flex">
+  <div class="loginCard">
+    <h1 class="loginH">Game Analytics</h1>
+    <p class="loginSub">Sign in to access the dashboard</p>
+    <div class="lf"><label>Email Address</label><input id="lUser" type="email" placeholder="you@company.com" autocomplete="email"/></div>
+    <div class="lf"><label>Password</label><input id="lPass" type="password" placeholder="Enter password" autocomplete="current-password"/></div>
+    <button class="loginBtn" onclick="doLogin()">Sign In</button>
+    <div class="loginErr" id="loginErr"></div>
+    <div style="margin-top:18px;padding-top:14px;border-top:1px solid var(--border);font-size:11px;color:var(--text3)">Restricted access — authorized users only</div>
+  </div>
+</div>
+
+<div class="shell" style="display:none" id="appShell">
 
 <aside class="sidebar">
   <div class="sb-top">
@@ -433,6 +458,10 @@ textarea.form-ctrl{resize:vertical;min-height:78px}
     <div class="sync-info"><span class="sync-dot"></span><span id="syncInfo">Demo data</span></div>
     <button class="refresh-btn" onclick="refreshData()" title="Refresh data">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 8A6 6 0 1 1 8 2"/><path d="M14 2v4h-4"/></svg>
+    </button>
+    <span style="font-size:12px;font-weight:600;color:var(--text2)" id="unameEl"></span>
+    <button class="refresh-btn" onclick="doLogout()" title="Sign out" style="color:var(--coral)">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M11 11l3-3-3-3M6 8h8"/></svg>
     </button>
   </div>
 
@@ -806,6 +835,61 @@ textarea.form-ctrl{resize:vertical;min-height:78px}
       </div>
     </div>
 
+    <!-- ── USER MANAGEMENT ── -->
+    <div class="tab-pane" id="tab-users">
+      <div style="max-width:760px">
+
+        <!-- Add user form -->
+        <div class="card" style="margin-bottom:16px" id="addUserCard">
+          <div class="card-hd"><span class="card-title">Add user <span class="card-sub">admin only</span></span></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-lbl">Email</label>
+              <input class="form-ctrl" id="nuEmail" type="email" placeholder="user@company.com"/>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Name</label>
+              <input class="form-ctrl" id="nuName" placeholder="Full name"/>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-lbl">Password</label>
+              <input class="form-ctrl" id="nuPwd" type="password" placeholder="Set password"/>
+            </div>
+            <div class="form-group">
+              <label class="form-lbl">Role</label>
+              <select class="form-ctrl" id="nuRole">
+                <option value="viewer">Viewer — read only</option>
+                <option value="manager">Manager — read + feedback</option>
+                <option value="admin">Admin — full access</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:14px">
+            <label class="form-lbl">Games access</label>
+            <input class="form-ctrl" id="nuGames" placeholder="* for all, or: mcds,gt2" value="*"/>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px">
+            <button class="btn-primary" onclick="addUser()">Add user</button>
+            <span id="addUserMsg" style="font-family:var(--mono);font-size:11px;color:var(--lime);display:none"></span>
+          </div>
+        </div>
+
+        <!-- Users list -->
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title">All users</span>
+            <button onclick="loadUsers()" style="font-family:var(--mono);font-size:11px;color:var(--cyan);background:none;border:none;cursor:pointer;font-weight:600">↻ Refresh</button>
+          </div>
+          <div id="usersList">
+            <div class="notice">Loading users…</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
   </div>
 </div>
 </div>
@@ -814,7 +898,7 @@ textarea.form-ctrl{resize:vertical;min-height:78px}
 // ═════════════════════════════════════════
 // CONFIG — Apps Script /exec URL + secret key
 // ═════════════════════════════════════════
-const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbz2c1AR0MbyJx-iizQfnDczFNCe9cJfhdNrWaDMf6nKMTFHsP8ChI--j70NxSZJZtVwmg/exec';
+const SHEET_API_URL = 'https://script.google.com/macros/s/AKfycbxXrMQiLqGnl5IVVEp10JK4pk8LGfL7Vf79kjpGmi56MgsrC8bp3i0X5QxhPi1gmgRBdg/exec';
 const SHEET_API_KEY = 'X9aPq7LmT4zWv2Rb';
 
 // 10-min milestone is auto-detected: step whose cumulative playtime is closest to 600s
@@ -875,6 +959,7 @@ const NAV_ICONS = {
   rating:    '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 1.5l2 4.5 4.5.5-3.5 3 1 4.5L8 11.5 4 14l1-4.5-3.5-3L6 6z"/></svg>',
   feedback:  '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M13.5 2.5h-11a1 1 0 00-1 1v7a1 1 0 001 1h3l2.5 3 2.5-3h3a1 1 0 001-1v-7a1 1 0 00-1-1z"/></svg>',
   thresholds:'<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="2.2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.1 3.1l1.4 1.4M11.5 11.5l1.4 1.4M3.1 12.9l1.4-1.4M11.5 4.5l1.4-1.4"/></svg>',
+  users:     '<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="5" r="3"/><path d="M1 14c0-3 2-5 5-5s5 2 5 5"/><circle cx="12.5" cy="5" r="2"/><path d="M12.5 9c1.5 0 3 1 3 3.5"/></svg>',
 };
 
 const SECTION_META = {
@@ -891,6 +976,7 @@ const SECTION_META = {
   rating:     { group:'App Health',     label:'Player Rating',   order:110 },
   feedback:   { group:'Team',           label:'Feedback',        order:120 },
   thresholds: { group:'Config',         label:'Thresholds',      order:130 },
+  users:      { group:'Config',         label:'User Management', order:140 },
 };
 
 // Section id → render function reference (late-bound so forward decls work)
@@ -908,6 +994,7 @@ const SECTION_RENDERS = {
   rating:     function(){ renderRating(); },
   feedback:   function(){ renderFeedback(); },
   thresholds: function(){ renderThresholds(); },
+  users:      function(){ renderUsers(); },
 };
 
 // Fallback enabled set when a game's sheet has no Config tab yet.
@@ -916,6 +1003,8 @@ const DEFAULT_ENABLED_SECTIONS = [
   'overview', 'growth', 'retention', 'playtime', 'ftue',
   'mechanics', 'events', 'liveops', 'stability', 'rating', 'feedback', 'thresholds'
 ];
+// Users section is always available but only shown to admins (filtered in getEnabledSections)
+const ADMIN_ONLY_SECTIONS = ['users'];
 
 function getEnabledSections(){
   const d = curData();
@@ -950,6 +1039,25 @@ function getEnabledSections(){
         render:SECTION_RENDERS[id],
       };
     }).filter(function(s){ return s.render; });
+  }
+
+  // Always add admin-only sections for admin users
+  if(CU && CU.role === 'admin'){
+    ADMIN_ONLY_SECTIONS.forEach(function(id){
+      if(!list.find(function(s){ return s.id === id; })){
+        const meta = SECTION_META[id] || {};
+        if(SECTION_RENDERS[id]){
+          list.push({
+            id:    id,
+            label: meta.label || id,
+            order: meta.order || 999,
+            group: meta.group || 'Config',
+            icon:  NAV_ICONS[id] || '',
+            render:SECTION_RENDERS[id],
+          });
+        }
+      }
+    });
   }
 
   return list.sort(function(a,b){ return a.order - b.order; });
@@ -1040,16 +1148,36 @@ function find10minStep(steps){
 
 function aggregateFtue(){
   const d = DATA[currentGame];
-  if(!d || !d.ftueRaw || !d.ftueRaw.length){ d.ftueFunnel = []; return; }
+  if(!d || !d.ftueRaw || !d.ftueRaw.length){ d.ftueFunnel = []; d._ftueBase = 0; return; }
   const rows = getWindow(d.ftueRaw);
-  if(!rows.length){ d.ftueFunnel = []; return; }
+  if(!rows.length){ d.ftueFunnel = []; d._ftueBase = 0; return; }
+
+  // Check if FTUE rows have their own newUsers column
+  const hasNewUsers = rows.some(function(r){ return r.newUsers != null && r.newUsers !== ''; });
+
   const byStep = {};
+  const newUsersByDate = {};
   rows.forEach(function(r){
     const sid = +r.id;
-    if(!byStep[sid]) byStep[sid] = { id:sid, name:r.name, userSum:0, playtimes:[] };
+    if(!byStep[sid]) byStep[sid] = { id:sid, name:r.name, userSum:0, newUsersSum:0, playtimes:[] };
     byStep[sid].userSum += +r.users || 0;
+    if(hasNewUsers && r.newUsers != null && r.newUsers !== ''){
+      // Track newUsers per date (not per step) to avoid double-counting
+      if(!newUsersByDate[r.date]){ newUsersByDate[r.date] = +r.newUsers || 0; }
+    }
     if(r.avgPlaytimeSec != null && r.avgPlaytimeSec !== '') byStep[sid].playtimes.push(+r.avgPlaytimeSec);
   });
+
+  // Base = sum of unique per-date newUsers from FTUE sheet, or fallback to Daily Metrics
+  var base = 0;
+  if(hasNewUsers){
+    base = Object.values(newUsersByDate).reduce(function(s,v){ return s + v; }, 0);
+  } else {
+    var cur = getWindow(d.daily || []);
+    base = sum(cur.map(function(x){ return +x.newUsers || 0; }));
+  }
+  d._ftueBase = base || 1;
+
   const steps = Object.values(byStep).sort(function(a,b){ return a.id - b.id; });
   d.ftueFunnel = steps.map(function(s){
     var pts = s.playtimes.slice().sort(function(a,b){return a-b;});
@@ -1088,10 +1216,10 @@ async function fetchFromSheet(gameId){
   if(!SHEET_API_URL) throw new Error('NO_URL');
   if(location.protocol === 'file:') throw new Error('FILE_PROTOCOL');
 
-  // cache-bust param so browsers/CDNs don't serve stale data
   const url = SHEET_API_URL
     + '?game='   + encodeURIComponent(gameId)
     + '&key='    + encodeURIComponent(SHEET_API_KEY)
+    + (getToken() ? '&token=' + encodeURIComponent(getToken()) : '')
     + '&refresh=1'
     + '&_cb='    + Date.now();
 
@@ -1492,7 +1620,7 @@ function renderOverview(){
 
   // Derived FTUE 10-min from funnel — base is period new users, not step 1
   const f = d.ftueFunnel && d.ftueFunnel.length ? d.ftueFunnel : [{id:0,name:'-',users:0,avgPlaytimeSec:0}];
-  const ftueBase = sum(cur.map(x => x.newUsers || 0)) || (f[0]?.users || 1);
+  const ftueBase = d._ftueBase || sum(cur.map(x => x.newUsers || 0)) || (f[0]?.users || 1);
   const step10min = find10minStep(f) || f[f.length-1];
   const ftue10Pct = ftueBase > 0 ? (step10min.users / ftueBase * 100) : 0;
   const ftueFinalPct = ftueBase > 0 ? (f[f.length-1].users / ftueBase * 100) : 0;
@@ -2034,8 +2162,8 @@ function renderFtue(){
   const f = d.ftueFunnel;
   const cur = getWindow(d.daily);
 
-  // BASE = total new users in the selected period (from Daily.NewUsers)
-  const base = sum(cur.map(x => x.newUsers || 0)) || (f[0]?.users || 1);
+  // BASE = from FTUE sheet's NewUsers column (preferred) or Daily.NewUsers fallback
+  const base = d._ftueBase || sum(cur.map(x => x.newUsers || 0)) || (f[0]?.users || 1);
 
   const endUsers = f[f.length-1].users;
   const milestoneStep = find10minStep(f) || f[f.length-1];
@@ -2867,6 +2995,135 @@ function saveThresh(){
 }
 
 // ═════════════════════════════════════════
+// USER MANAGEMENT (admin only)
+// ═════════════════════════════════════════
+
+function renderUsers(){
+  // Only admin can see this section
+  if(!CU || CU.role !== 'admin'){
+    g('usersList').innerHTML = '<div class="notice">Admin access required.</div>';
+    g('addUserCard').style.display = 'none';
+    return;
+  }
+  g('addUserCard').style.display = '';
+  loadUsers();
+}
+
+async function loadUsers(){
+  const token = getToken();
+  if(!token){ g('usersList').innerHTML = '<div class="notice">Not authenticated.</div>'; return; }
+  g('usersList').innerHTML = '<div class="notice">Loading…</div>';
+  try {
+    const url = SHEET_API_URL + '?action=listUsers&key='+encodeURIComponent(SHEET_API_KEY)+'&token='+encodeURIComponent(token)+'&_cb='+Date.now();
+    const res = await fetch(url, {redirect:'follow'});
+    const data = await res.json();
+    if(data.error){ g('usersList').innerHTML = '<div class="notice">'+data.error+'</div>'; return; }
+    renderUsersList(data.users || []);
+  } catch(e){
+    g('usersList').innerHTML = '<div class="notice">Error: '+e.message+'</div>';
+  }
+}
+
+function renderUsersList(users){
+  if(!users.length){ g('usersList').innerHTML = '<div class="notice">No users found.</div>'; return; }
+  const roleColor = {admin:'var(--magenta)', manager:'var(--cyan)', viewer:'var(--text3)'};
+  g('usersList').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 110px 80px 90px 80px;gap:10px;padding:0 4px 10px;font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--border);margin-bottom:8px">
+      <span>Email / Name</span><span>Role</span><span>Games</span><span>Status</span><span></span>
+    </div>
+    ${users.map(u => `
+    <div style="display:grid;grid-template-columns:1fr 110px 80px 90px 80px;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text)">${u.name || '—'}</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--text3)">${u.email}</div>
+      </div>
+      <div>
+        <select onchange="changeRole('${u.email}',this.value)" style="background:var(--surface2);border:1px solid var(--border2);border-radius:6px;font-family:var(--mono);font-size:10px;color:${roleColor[u.role]||'var(--text)'};padding:4px 6px;cursor:pointer">
+          <option value="viewer"   ${u.role==='viewer'   ?'selected':''}>Viewer</option>
+          <option value="manager"  ${u.role==='manager'  ?'selected':''}>Manager</option>
+          <option value="admin"    ${u.role==='admin'    ?'selected':''}>Admin</option>
+        </select>
+      </div>
+      <div style="font-family:var(--mono);font-size:10px;color:var(--text2)">${u.games||'*'}</div>
+      <div>
+        <span style="font-family:var(--mono);font-size:9px;padding:3px 8px;border-radius:10px;background:${u.active?'var(--limeBg)':'var(--coralBg)'};color:${u.active?'var(--lime)':'var(--coral)'}">
+          ${u.active ? 'Active' : 'Disabled'}
+        </span>
+      </div>
+      <div style="text-align:right">
+        ${u.email !== CU.email ? `<button onclick="removeUser('${u.email}')" style="font-family:var(--mono);font-size:10px;color:var(--coral);background:none;border:none;cursor:pointer;font-weight:600">Remove</button>` : '<span style="font-family:var(--mono);font-size:10px;color:var(--text3)">You</span>'}
+      </div>
+    </div>`).join('')}
+  `;
+}
+
+async function addUser(){
+  const email  = g('nuEmail').value.trim().toLowerCase();
+  const name   = g('nuName').value.trim();
+  const pwd    = g('nuPwd').value;
+  const role   = g('nuRole').value;
+  const games  = g('nuGames').value.trim() || '*';
+  const msgEl  = g('addUserMsg');
+
+  if(!email || !pwd){ alert('Email and password required.'); return; }
+
+  // Hash password before sending (same as login)
+  const hashed = await hashPwd(pwd);
+  const token  = getToken();
+  const url = SHEET_API_URL
+    + '?action=addUser&key='+encodeURIComponent(SHEET_API_KEY)
+    + '&token='+encodeURIComponent(token)
+    + '&email='+encodeURIComponent(email)
+    + '&name='+encodeURIComponent(name)
+    + '&pwd='+encodeURIComponent(hashed)
+    + '&role='+encodeURIComponent(role)
+    + '&games='+encodeURIComponent(games)
+    + '&_cb='+Date.now();
+
+  try {
+    const res = await fetch(url, {redirect:'follow'});
+    const data = await res.json();
+    if(data.error){ alert('Error: '+data.error); return; }
+    msgEl.textContent = '✓ User added!'; msgEl.style.display='inline';
+    setTimeout(()=>{ msgEl.style.display='none'; }, 3000);
+    g('nuEmail').value=''; g('nuName').value=''; g('nuPwd').value='';
+    loadUsers();
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+async function changeRole(email, newRole){
+  const token = getToken();
+  const url = SHEET_API_URL
+    + '?action=updateRole&key='+encodeURIComponent(SHEET_API_KEY)
+    + '&token='+encodeURIComponent(token)
+    + '&email='+encodeURIComponent(email)
+    + '&role='+encodeURIComponent(newRole)
+    + '&_cb='+Date.now();
+  try {
+    const res = await fetch(url, {redirect:'follow'});
+    const data = await res.json();
+    if(data.error){ alert('Error: '+data.error); return; }
+    loadUsers();
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+async function removeUser(email){
+  if(!confirm('Remove user: '+email+'?')) return;
+  const token = getToken();
+  const url = SHEET_API_URL
+    + '?action=removeUser&key='+encodeURIComponent(SHEET_API_KEY)
+    + '&token='+encodeURIComponent(token)
+    + '&email='+encodeURIComponent(email)
+    + '&_cb='+Date.now();
+  try {
+    const res = await fetch(url, {redirect:'follow'});
+    const data = await res.json();
+    if(data.error){ alert('Error: '+data.error); return; }
+    loadUsers();
+  } catch(e){ alert('Error: '+e.message); }
+}
+
+// ═════════════════════════════════════════
 // CHART FACTORY
 // ═════════════════════════════════════════
 function makeChart(id, type, data, extra={}){
@@ -3030,7 +3287,120 @@ function onDateInput(){
   renderAll();
 }
 
-init();
+// ═════════════════════════════════════════
+// AUTH — Email/Password with Apps Script backend
+// ═════════════════════════════════════════
+const SESSION_HOURS = 8;
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+let CU = null; // current user {email, name, role}
+
+async function hashPwd(pwd){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pwd));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function createSession(user, token){
+  const session = { email:user.email, name:user.name, role:user.role, token:token, expires:Date.now()+SESSION_HOURS*3600*1000 };
+  sessionStorage.setItem('gd_session', JSON.stringify(session));
+  return session;
+}
+function getSession(){
+  try{ const s=JSON.parse(sessionStorage.getItem('gd_session')||'null'); if(!s||Date.now()>s.expires){clearSession();return null;} return s; }
+  catch(e){return null;}
+}
+function clearSession(){ sessionStorage.removeItem('gd_session'); }
+function getToken(){ return getSession()?.token || ''; }
+
+function getAttempts(email){
+  try{return JSON.parse(localStorage.getItem('gd_att_'+btoa(email))||'{"count":0,"until":0}');}
+  catch(e){return{count:0,until:0};}
+}
+function setAttempts(email,data){localStorage.setItem('gd_att_'+btoa(email),JSON.stringify(data));}
+function clearAttempts(email){localStorage.removeItem('gd_att_'+btoa(email));}
+
+async function doLogin(){
+  const emailRaw = g('lUser').value.trim().toLowerCase();
+  const pwd = g('lPass').value;
+  const errEl = g('loginErr');
+
+  if(!emailRaw || !pwd){ errEl.textContent='Enter email and password.'; errEl.style.display='block'; return; }
+
+  const att = getAttempts(emailRaw);
+  if(att.until > Date.now()){
+    const mins = Math.ceil((att.until-Date.now())/60000);
+    errEl.textContent = 'Too many attempts. Try again in '+mins+' min.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  const btn = document.querySelector('.loginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+
+  try {
+    const hashed = await hashPwd(pwd);
+    const url = SHEET_API_URL + '?action=login&key='+encodeURIComponent(SHEET_API_KEY)+'&email='+encodeURIComponent(emailRaw)+'&pwd='+encodeURIComponent(hashed)+'&_cb='+Date.now();
+    const res = await fetch(url, {redirect:'follow'});
+    const resp = await res.json();
+
+    if(resp.error){
+      const a = getAttempts(emailRaw);
+      a.count = (a.count||0)+1;
+      if(a.count >= MAX_ATTEMPTS){ a.until=Date.now()+LOCKOUT_MINUTES*60*1000; a.count=0; errEl.textContent='Account locked for '+LOCKOUT_MINUTES+' minutes.'; }
+      else { errEl.textContent='Invalid email or password. '+(MAX_ATTEMPTS-a.count)+' attempts remaining.'; }
+      setAttempts(emailRaw, a);
+      errEl.style.display = 'block';
+      g('lPass').value = ''; g('lPass').focus();
+      return;
+    }
+
+    clearAttempts(emailRaw);
+    createSession(resp.user, resp.token);
+    CU = { email:resp.user.email, name:resp.user.name, role:resp.user.role };
+    loginSuccess();
+  } catch(e){
+    errEl.textContent = 'Connection failed: '+e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign In';
+  }
+}
+
+function loginSuccess(){
+  g('loginScreen').style.display = 'none';
+  g('appShell').style.display = '';
+  g('unameEl').textContent = CU.name || CU.email.split('@')[0];
+  init();
+}
+
+function checkSession(){
+  const s = getSession();
+  if(!s) return false;
+  CU = { email:s.email, name:s.name, role:s.role };
+  loginSuccess();
+  return true;
+}
+
+function doLogout(){
+  clearSession();
+  CU = null;
+  g('loginScreen').style.display = 'flex';
+  g('appShell').style.display = 'none';
+  g('lUser').value = ''; g('lPass').value = '';
+  g('loginErr').style.display = 'none';
+}
+
+// Enter key handlers
+document.addEventListener('DOMContentLoaded', function(){
+  if(!checkSession()) g('loginScreen').style.display = 'flex';
+});
+document.addEventListener('keydown', function(e){
+  if(e.key==='Enter' && g('loginScreen').style.display!=='none'){
+    if(document.activeElement===g('lUser')) g('lPass').focus();
+    else doLogin();
+  }
+});
 </script>
 </body>
 </html>
