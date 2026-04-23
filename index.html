@@ -916,11 +916,8 @@ let charts = {};
 let shopRange = { min:1, max:20 };
 let dayRange  = { min:1, max:30 };
 
-let games = [
-  { id:'mcds', name:'My Car Dealership Simulator' },
-  { id:'gt2',  name:'Galactic Traders' },
-  { id:'rrd',  name:'Retro Racing Deluxe' },
-];
+// Games populated from Apps Script (GAMES config, filtered by user access)
+let games = [];
 
 let thresholds = {
   crash:   { label:'Crash rate max',      val:1.5,  unit:'%' },
@@ -1524,16 +1521,20 @@ function _REMOVED_generateDemo(gameId){
 // INIT
 // ═════════════════════════════════════════
 async function init(){
-  // Setup shell UI
-  const sel = g('gameSelect');
-  sel.innerHTML = games.map(function(x){ return '<option value="'+x.id+'">'+x.name+'</option>'; }).join('');
-  sel.value = currentGame;
-  updateGameBranding();
-  applyPresetToInputs(14);
-
   // Show loading state — no demo data
   setSyncState('loading');
   showLoadingOverlay(true);
+
+  // Fetch allowed games from Apps Script (filtered by user access)
+  await fetchGameList();
+
+  // Setup shell UI with real games
+  const sel = g('gameSelect');
+  sel.innerHTML = games.map(function(x){ return '<option value="'+x.id+'">'+x.name+'</option>'; }).join('');
+  if(games.length && !games.find(function(x){return x.id===currentGame;})) currentGame = games[0].id;
+  sel.value = currentGame;
+  updateGameBranding();
+  applyPresetToInputs(14);
 
   const result = await loadGameData(currentGame);
   if(result.ok){
@@ -1549,6 +1550,25 @@ async function init(){
   renderAll();
   goTab(currentTab);
   showLoadingOverlay(false);
+}
+
+async function fetchGameList(){
+  try {
+    const token = getToken();
+    const url = SHEET_API_URL + '?action=listGames&key='+encodeURIComponent(SHEET_API_KEY)
+      + (token ? '&token='+encodeURIComponent(token) : '')
+      + '&_cb='+Date.now();
+    const res = await fetch(url, { redirect:'follow' });
+    const data = await res.json();
+    if(data && Array.isArray(data.games) && data.games.length){
+      games = data.games;
+    } else {
+      games = [];
+    }
+  } catch(e) {
+    console.warn('[mcds] Failed to fetch game list:', e.message);
+    games = [];
+  }
 }
 
 function showLoadingOverlay(show){
@@ -1626,12 +1646,14 @@ function renderOverview(){
   const ftueFinalPct = ftueBase > 0 ? (f[f.length-1].users / ftueBase * 100) : 0;
 
   // Hero: 5 KPIs — Installs, DAU, D1 Retention, D0 Playtime, FTUE Complete
+  const curDates  = cur.map(x=>x.date);
+  const curRDates = curR.map(x=>x.date);
   const kpis = [
-    { cls:'cy', lbl:'Installs',      val:fmtKn(sum(cur.map(x=>x.installs))),    data:cur.map(x=>x.installs),    cur:sum(cur.map(x=>x.installs)), prev:sum(prev.map(x=>x.installs)), sub:'total period',  col:'--cyan',    fmt:fmtKn },
-    { cls:'vl', lbl:'DAU',           val:fmtKn(avg(cur.map(x=>x.dau))),         data:cur.map(x=>x.dau),         cur:avg(cur.map(x=>x.dau)),       prev:avg(prev.map(x=>x.dau)),        sub:'avg period',    col:'--violet',  fmt:fmtKn },
-    { cls:'mg', lbl:'D1 Retention',  val:fmtPct(avg(curR.map(x=>x.d1))),        data:curR.map(x=>x.d1),         cur:avg(curR.map(x=>x.d1)),       prev:avg(prevR.map(x=>x.d1)),        sub:'avg period',    col:'--magenta', fmt:fmtPct },
-    { cls:'lm', lbl:'D0 Playtime',   val:fmtSec(avg(cur.map(x=>x.d0Playtime))), data:cur.map(x=>x.d0Playtime),  cur:avg(cur.map(x=>x.d0Playtime)),prev:avg(prev.map(x=>x.d0Playtime)), sub:'avg new user',  col:'--lime',    fmt:fmtSec },
-    { cls:'am', lbl:'FTUE Complete', val:fmtPct(avg(cur.map(x=>x.ftue))),       data:cur.map(x=>x.ftue),        cur:avg(cur.map(x=>x.ftue)),      prev:avg(prev.map(x=>x.ftue)),       sub:'all steps',     col:'--amber',   fmt:fmtPct },
+    { cls:'cy', lbl:'Installs',      val:fmtKn(sum(cur.map(x=>x.installs))),    data:cur.map(x=>x.installs),    dates:curDates,  cur:sum(cur.map(x=>x.installs)), prev:sum(prev.map(x=>x.installs)), sub:'total period',  col:'--cyan',    fmt:fmtKn },
+    { cls:'vl', lbl:'DAU',           val:fmtKn(avg(cur.map(x=>x.dau))),         data:cur.map(x=>x.dau),         dates:curDates,  cur:avg(cur.map(x=>x.dau)),       prev:avg(prev.map(x=>x.dau)),        sub:'avg period',    col:'--violet',  fmt:fmtKn },
+    { cls:'mg', lbl:'D1 Retention',  val:fmtPct(avg(curR.map(x=>x.d1))),        data:curR.map(x=>x.d1),         dates:curRDates, cur:avg(curR.map(x=>x.d1)),       prev:avg(prevR.map(x=>x.d1)),        sub:'avg period',    col:'--magenta', fmt:fmtPct },
+    { cls:'lm', lbl:'D0 Playtime',   val:fmtSec(avg(cur.map(x=>x.d0Playtime))), data:cur.map(x=>x.d0Playtime),  dates:curDates,  cur:avg(cur.map(x=>x.d0Playtime)),prev:avg(prev.map(x=>x.d0Playtime)), sub:'avg new user',  col:'--lime',    fmt:fmtSec },
+    { cls:'am', lbl:'FTUE Complete', val:fmtPct(avg(cur.map(x=>x.ftue))),       data:cur.map(x=>x.ftue),        dates:curDates,  cur:avg(cur.map(x=>x.ftue)),      prev:avg(prev.map(x=>x.ftue)),       sub:'all steps',     col:'--amber',   fmt:fmtPct },
   ];
 
   g('heroKpis').innerHTML = kpis.map((k,i)=>`
@@ -1650,7 +1672,7 @@ function renderOverview(){
 
   kpis.forEach((k,i)=>{
     const color = getComputedStyle(document.documentElement).getPropertyValue(k.col || '--cyan').trim();
-    drawSpark('sp'+i, k.data, color, k.fmt);
+    drawSpark('sp'+i, k.data, color, k.fmt, k.dates);
   });
 
   // Alerts
@@ -1669,15 +1691,16 @@ function renderOverview(){
     strip.classList.remove('show');
   }
 
-  // Retention overview card
-  const lastR = curR[curR.length-1] || {};
+  // Retention overview card — average of all mature values in period (not just last row)
   g('ovRetStats').innerHTML = ['d1','d3','d7'].map(k=>{
-    const v = lastR[k];
-    const hasVal = v != null && v !== '' && !isNaN(v);
-    const bad = hasVal && ((k==='d1' && +v < thresholds.d1.val) || (k==='d7' && +v < thresholds.d7.val));
-    return `<div class="stat-cell"><div class="stat-lbl">${k.toUpperCase()}</div><div class="stat-val ${bad?'bad':'good'}">${hasVal?(+v).toFixed(1)+'%':'—'}</div></div>`;
+    const vals = curR.map(x => x[k]).filter(v => v != null && v !== '' && !isNaN(v)).map(v => +v);
+    const hasVal = vals.length > 0;
+    const avgVal = hasVal ? vals.reduce((s,v)=>s+v, 0) / vals.length : 0;
+    const bad = hasVal && ((k==='d1' && avgVal < thresholds.d1.val) || (k==='d7' && avgVal < thresholds.d7.val));
+    const sub = hasVal ? `<div style="font-size:9px;color:var(--text3);margin-top:2px">avg of ${vals.length} cohort${vals.length>1?'s':''}</div>` : '';
+    return `<div class="stat-cell"><div class="stat-lbl">${k.toUpperCase()}</div><div class="stat-val ${bad?'bad':'good'}">${hasVal?avgVal.toFixed(1)+'%':'—'}</div>${sub}</div>`;
   }).join('');
-  renderCohortMini(curR.slice(-6), 'ovCohort');
+  renderCohortMini(curR.slice(-10), 'ovCohort');
 
   // Playtime overview card
   g('ovPlayStats').innerHTML = `
@@ -1861,12 +1884,22 @@ function renderOvLiveOpsPreview(){
 
 const sparkCharts = {};
 
-function drawSpark(id, data, color, fmt){
+function drawSpark(id, data, color, fmt, dates){
   const c = g(id); if(!c) return;
   if(sparkCharts[id]){ try{sparkCharts[id].destroy();}catch(e){} delete sparkCharts[id]; }
 
   const vals = (data || []).map(v => (v == null || v === '') ? null : +v);
   if(vals.filter(v => v != null).length < 2) return;
+
+  const formatter = fmt || fmtKn;
+
+  // Format date nicely: "2026-04-15" → "Wed, 15 Apr"
+  const fmtDate = (iso) => {
+    if(!iso) return '';
+    const d = new Date(iso + 'T00:00:00');
+    if(isNaN(d)) return iso;
+    return d.toLocaleDateString('en-GB', { weekday:'short', day:'2-digit', month:'short' });
+  };
 
   const ctx = c.getContext('2d');
   const h = c.offsetHeight || 28;
@@ -1877,7 +1910,7 @@ function drawSpark(id, data, color, fmt){
   sparkCharts[id] = new Chart(c, {
     type: 'line',
     data: {
-      labels: vals.map((_, i) => i),
+      labels: vals.map((_, i) => (dates && dates[i]) ? dates[i] : i),
       datasets: [{
         data: vals,
         borderColor: color,
@@ -1905,18 +1938,34 @@ function drawSpark(id, data, color, fmt){
           animation: false,
           mode: 'index',
           intersect: false,
-          backgroundColor: 'rgba(7,11,20,0.95)',
+          backgroundColor: 'rgba(7,11,20,0.96)',
           titleColor: '#E8ECFF',
           bodyColor: color,
           borderColor: color,
           borderWidth: 1,
-          padding: 6,
-          titleFont: { family: 'Inter', size: 10, weight: '600' },
-          bodyFont: { family: 'JetBrains Mono', size: 10 },
+          padding: 8,
+          titleFont: { family: 'Inter', size: 11, weight: '600' },
+          bodyFont: { family: 'JetBrains Mono', size: 11 },
           displayColors: false,
           callbacks: {
-            title: () => '',
-            label: ctx => (fmt || fmtKn)(ctx.parsed.y)
+            title: (items) => {
+              const i = items[0].dataIndex;
+              return (dates && dates[i]) ? fmtDate(dates[i]) : '';
+            },
+            label: ctx => formatter(ctx.parsed.y),
+            afterBody: (items) => {
+              const i = items[0].dataIndex;
+              const cur = vals[i];
+              // Find previous non-null value
+              let prev = null;
+              for(let j = i - 1; j >= 0; j--){ if(vals[j] != null){ prev = vals[j]; break; } }
+              if(cur == null || prev == null) return '';
+              const diff = cur - prev;
+              const pct = prev !== 0 ? (diff / Math.abs(prev) * 100) : 0;
+              const arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '•');
+              const sign = diff > 0 ? '+' : '';
+              return [`vs prev: ${arrow} ${sign}${formatter(diff)} (${sign}${pct.toFixed(1)}%)`];
+            }
           }
         }
       },
