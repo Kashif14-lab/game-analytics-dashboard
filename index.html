@@ -1175,7 +1175,16 @@ function aggregateFtue(){
   }
   d._ftueBase = base || 1;
 
-  const steps = Object.values(byStep).sort(function(a,b){ return a.id - b.id; });
+  // Hide noise / extra step ids: drop any step whose users are below 1% of the
+  // funnel base (period new users). This strips out the spurious low-count steps
+  // that were polluting the funnel. Guard: if that would empty the funnel (odd
+  // data), keep the unfiltered set so nothing breaks downstream.
+  const FTUE_MIN_PCT = 0.01;                       // 1% of base
+  const ftueMinUsers = (d._ftueBase || 0) * FTUE_MIN_PCT;
+  var steps = Object.values(byStep).sort(function(a,b){ return a.id - b.id; });
+  var keptSteps = steps.filter(function(s){ return s.userSum >= ftueMinUsers; });
+  if(keptSteps.length) steps = keptSteps;
+  d._ftueHiddenCount = (Object.keys(byStep).length - steps.length); // for an optional note
   d.ftueFunnel = steps.map(function(s){
     var pts = s.playtimes.slice().sort(function(a,b){return a-b;});
     var med = 0;
@@ -2263,7 +2272,8 @@ function renderFtue(){
   buildFtueChart('cvFtueChart', f, base);
   renderTutorialTimeChart();
 
-  g('ftueBadge').textContent = f.length + ' steps';
+  const _hidden = d._ftueHiddenCount || 0;
+  g('ftueBadge').textContent = f.length + ' steps' + (_hidden ? ` · ${_hidden} low-volume hidden (<1%)` : '');
 
   // Hero "starting users" row that anchors the funnel — every step's engagement is
   // measured against this base (sum of new users in the selected period).
@@ -3237,6 +3247,16 @@ function makeChart(id, type, data, extra={}){
   };
   const opts = {...base, ...extra};
   if(extra.scales) opts.scales = {...base.scales, ...extra.scales};
+  // Align every chart to a 0 baseline: force each Y axis to begin at zero
+  // (unless it explicitly sets its own min), so all charts share the same origin.
+  Object.keys(opts.scales || {}).forEach(function(k){
+    if(k.charAt(0) === 'y'){
+      var ax = opts.scales[k];
+      if(ax && typeof ax === 'object' && ax.beginAtZero === undefined && ax.min === undefined){
+        ax.beginAtZero = true;
+      }
+    }
+  });
   if(extra.plugins) {
     opts.plugins = {...base.plugins, ...extra.plugins};
     // Merge tooltip options so extras can add callbacks without clobbering mode/animation
